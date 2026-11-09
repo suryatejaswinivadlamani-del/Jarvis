@@ -1,13 +1,24 @@
 import React, { useState } from 'react';
 import { useJarvis } from '../../../context/JarvisContext';
-import { DatabaseIcon, TrashIcon, PlusIcon, SearchIcon, SparklesIcon } from '../../common/Icons';
+import { DatabaseIcon, TrashIcon, PlusIcon, SearchIcon } from '../../common/Icons';
 
 export default function MemoryCentreModule() {
-  const { memories, addMemory, deleteMemory } = useJarvis();
+  const {
+    memories,
+    addMemory,
+    updateMemory,
+    deleteMemory,
+    clearMemories,
+    memoryConsent,
+    setMemoryConsent,
+  } = useJarvis();
   const [searchFilter, setSearchFilter] = useState('');
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
   const [newCategory, setNewCategory] = useState('Preferences');
+  const [editingId, setEditingId] = useState(null);
+  const [editKey, setEditKey] = useState('');
+  const [editValue, setEditValue] = useState('');
 
   const handleCreate = (e) => {
     e.preventDefault();
@@ -54,8 +65,33 @@ export default function MemoryCentreModule() {
             <span className="pill-number text-emerald">100%</span>
             <span className="pill-name">RECALL INTEGRITY</span>
           </div>
+          <button
+            type="button"
+            className={`hud-toggle-btn ${memoryConsent ? 'active' : ''}`}
+            aria-pressed={memoryConsent}
+            onClick={() => setMemoryConsent(!memoryConsent)}
+          >
+            MEMORY {memoryConsent ? 'ON' : 'OFF'}
+          </button>
+          <button
+            type="button"
+            className="hud-danger-btn"
+            disabled={memories.length === 0}
+            onClick={() => {
+              if (window.confirm('Clear all saved JARVIS memories?')) clearMemories();
+            }}
+          >
+            <TrashIcon className="trash-icon" />
+            <span>CLEAR ALL</span>
+          </button>
         </div>
       </div>
+
+      <p className="memory-consent-note">
+        {memoryConsent
+          ? 'Memory is enabled. Saved facts stay in this browser and are included in AI prompts to personalize replies.'
+          : 'Memory is off. JARVIS will not save or use personal facts between conversations.'}
+      </p>
 
       <div className="memory-layout-grid">
         {/* Left Column: Memory List & Search */}
@@ -87,21 +123,51 @@ export default function MemoryCentreModule() {
                     <div className="item-badge-row">
                       <span className="item-category-tag">{item.category}</span>
                       <span className="item-timestamp">{item.timestamp}</span>
-                      <button
-                        className="delete-memory-btn"
-                        onClick={() => deleteMemory(item.id)}
-                        title="Delete memory record"
-                      >
-                        <TrashIcon className="trash-icon" />
-                      </button>
+                      <div className="memory-item-actions">
+                        <button
+                          className="delete-memory-btn"
+                          onClick={() => {
+                            setEditingId(item.id);
+                            setEditKey(item.key);
+                            setEditValue(item.value);
+                          }}
+                          title="Edit memory record"
+                        >
+                          EDIT
+                        </button>
+                        <button
+                          className="delete-memory-btn"
+                          onClick={() => deleteMemory(item.id)}
+                          title="Delete memory record"
+                        >
+                          <TrashIcon className="trash-icon" />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="memory-key-row">
-                      <strong>KEY:</strong> {item.key}
-                    </div>
-                    <div className="memory-value-row">
-                      <strong>VALUE:</strong> {item.value}
-                    </div>
+                    {editingId === item.id ? (
+                      <form
+                        className="memory-edit-form"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          if (!editKey.trim() || !editValue.trim()) return;
+                          updateMemory(item.id, { key: editKey.trim(), value: editValue.trim() });
+                          setEditingId(null);
+                        }}
+                      >
+                        <input className="hud-input" value={editKey} onChange={(event) => setEditKey(event.target.value)} aria-label="Memory key" />
+                        <textarea className="hud-textarea" value={editValue} onChange={(event) => setEditValue(event.target.value)} aria-label="Memory value" rows="2" />
+                        <div className="memory-edit-actions">
+                          <button type="submit" className="hud-action-btn primary">SAVE</button>
+                          <button type="button" className="hud-action-btn secondary" onClick={() => setEditingId(null)}>CANCEL</button>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
+                        <div className="memory-key-row"><strong>KEY:</strong> {item.key}</div>
+                        <div className="memory-value-row"><strong>VALUE:</strong> {item.value}</div>
+                      </>
+                    )}
                   </div>
                 ))
               )}
@@ -114,11 +180,11 @@ export default function MemoryCentreModule() {
           {/* Add New Memory Form */}
           <div className="hud-card">
             <div className="card-top-header">
-              <span>// INJECT NEW MEMORY RECORD</span>
-              <span className="text-cyan">WRITE ACCESS</span>
+              <span>// ADD USER-APPROVED MEMORY</span>
+              <span className={memoryConsent ? 'text-cyan' : 'text-muted'}>{memoryConsent ? 'WRITE ACCESS' : 'CONSENT REQUIRED'}</span>
             </div>
 
-            <form onSubmit={handleCreate} className="memory-form">
+            <form onSubmit={handleCreate} className="memory-form" aria-disabled={!memoryConsent}>
               <div className="form-field">
                 <label>FACT / DIRECTIVE KEY</label>
                 <input
@@ -128,6 +194,7 @@ export default function MemoryCentreModule() {
                   placeholder="e.g., Preferred Styling Library"
                   className="hud-input"
                   required
+                  disabled={!memoryConsent}
                 />
               </div>
 
@@ -140,6 +207,7 @@ export default function MemoryCentreModule() {
                   className="hud-textarea"
                   rows="3"
                   required
+                  disabled={!memoryConsent}
                 />
               </div>
 
@@ -149,6 +217,7 @@ export default function MemoryCentreModule() {
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   className="hud-select"
+                  disabled={!memoryConsent}
                 >
                   <option value="Preferences">Preferences</option>
                   <option value="Identity">Identity</option>
@@ -158,7 +227,7 @@ export default function MemoryCentreModule() {
                 </select>
               </div>
 
-              <button type="submit" className="hud-action-btn primary full-width">
+              <button type="submit" className="hud-action-btn primary full-width" disabled={!memoryConsent}>
                 <PlusIcon />
                 <span>COMMIT TO MEMORY STORE</span>
               </button>
@@ -186,8 +255,8 @@ export default function MemoryCentreModule() {
                 <span className="text-cyan">{memories.length * 0.4} KB LocalStorage</span>
               </div>
               <div className="vector-row">
-                <span>BACKEND SYNC</span>
-                <span className="text-muted">Awaiting API Proxy</span>
+                <span>MEMORY CONSENT</span>
+                <span className={memoryConsent ? 'text-emerald' : 'text-muted'}>{memoryConsent ? 'ENABLED' : 'DISABLED'}</span>
               </div>
             </div>
           </div>

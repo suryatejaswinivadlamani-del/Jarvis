@@ -1,5 +1,13 @@
 # React + Vite
 
+## Desktop application
+
+Install frontend dependencies with `npm install`, then run `npm run desktop:dev` to open the existing J.A.R.V.I.S interface in its Electron desktop window. Run `npm run desktop:build` to create a Windows NSIS installer in `frontend/release`.
+
+The packaged app starts the existing Express backend locally. Store `OPENAI_API_KEY` and optional `AI_MODEL` in `%APPDATA%/jarvis-assistant/.env`; do not put secrets in frontend files. In the desktop app, closing the window hides J.A.R.V.I.S in the system tray. Choose Quit from the tray menu to stop it. Microphone and wake-word capture remain off until enabled in the Voice Assistant module, and recognition stops when the window is hidden.
+
+The optional spoken startup greeting is controlled from System Settings. It does not activate the microphone.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

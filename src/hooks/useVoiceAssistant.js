@@ -506,6 +506,7 @@ export function useVoiceAssistant({ onCommandReceived, soundEnabled = true }) {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         stopWakeWordService();
+        stopMicListening();
       } else if (wakeWordEnabledRef.current) {
         restartWakeWordDebounced();
       }

@@ -5,7 +5,14 @@ import { SettingsIcon, RefreshIcon, SparklesIcon, TrashIcon } from '../../common
 import { playSciFiSound } from '../../../utils/audio';
 
 export default function SystemSettingsModule() {
-  const { backendStatus, checkHealth, soundEnabled, setSoundEnabled } = useJarvis();
+  const {
+    backendStatus,
+    checkHealth,
+    soundEnabled,
+    setSoundEnabled,
+    startupGreetingEnabled,
+    setStartupGreetingEnabled,
+  } = useJarvis();
   const [proxyUrl, setProxyUrl] = useState(apiService.getBaseUrl());
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -52,6 +59,8 @@ def chat(req: ChatRequest):
   const handleClearCache = () => {
     if (window.confirm("Reset J.A.R.V.I.S local memories and tasks?")) {
       localStorage.removeItem('jarvis_memories');
+      localStorage.removeItem('jarvis_conversation');
+      localStorage.removeItem('jarvis_memory_consent');
       localStorage.removeItem('jarvis_tasks');
       if (soundEnabled) playSciFiSound('alert');
       window.location.reload();
@@ -145,6 +154,20 @@ def chat(req: ChatRequest):
                   onClick={() => setSoundEnabled(!soundEnabled)}
                 >
                   {soundEnabled ? 'ENABLED' : 'MUTED'}
+                </button>
+              </div>
+
+              <div className="toggle-item-row">
+                <div>
+                  <strong>Startup Greeting</strong>
+                  <p>Speak a short welcome when JARVIS starts. Microphone stays off until you activate it.</p>
+                </div>
+                <button
+                  className={`toggle-switch ${startupGreetingEnabled ? 'on' : 'off'}`}
+                  aria-pressed={startupGreetingEnabled}
+                  onClick={() => setStartupGreetingEnabled(!startupGreetingEnabled)}
+                >
+                  {startupGreetingEnabled ? 'ENABLED' : 'DISABLED'}
                 </button>
               </div>
 

@@ -3,6 +3,47 @@
  * Pure Web Audio API & SpeechSynthesis (100% Client-side, No external tracking)
  */
 
+const MAX_SPEECH_CHUNK_LENGTH = 180;
+let activeSpeechId = 0;
+let speechQueue = [];
+let isSpeechActive = false;
+
+export const splitSpeechText = (text, maxLength = MAX_SPEECH_CHUNK_LENGTH) => {
+  const source = String(text || '');
+  if (!source) return [];
+
+  const chunks = [];
+  let start = 0;
+  while (start < source.length) {
+    let end = Math.min(start + maxLength, source.length);
+    if (end < source.length) {
+      const segment = source.slice(start, end);
+      const sentenceBoundary = Math.max(
+        segment.lastIndexOf('. '),
+        segment.lastIndexOf('! '),
+        segment.lastIndexOf('? '),
+        segment.lastIndexOf('; '),
+        segment.lastIndexOf(': ')
+      );
+      const whitespaceBoundary = Math.max(
+        segment.lastIndexOf(' '),
+        segment.lastIndexOf('\n'),
+        segment.lastIndexOf('\t')
+      );
+
+      if (sentenceBoundary >= maxLength * 0.55) {
+        end = start + sentenceBoundary + 1;
+      } else if (whitespaceBoundary > 0) {
+        end = start + whitespaceBoundary;
+      }
+    }
+
+    chunks.push(source.slice(start, end));
+    start = end;
+  }
+  return chunks;
+};
+
 export const playSciFiSound = (type = 'beep') => {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -106,31 +147,36 @@ export const getAvailableFemaleVoices = () => {
  * Cancel/stop speaking immediately
  */
 export const stopSpeaking = () => {
+  activeSpeechId += 1;
+  speechQueue = [];
+  isSpeechActive = false;
   if (typeof window !== 'undefined' && window.speechSynthesis) {
     window.speechSynthesis.cancel();
   }
 };
 
-/**
- * Speak text with natural female voice
- */
-export const speakJarvisFemale = (text, options = {}) => {
+const startSpeech = (text, options = {}) => {
   if (typeof window === 'undefined' || !window.speechSynthesis) {
-    if (options.onEnd) options.onEnd();
+    isSpeechActive = false;
+    options.onEnd?.();
+    processSpeechQueue();
     return;
   }
 
   try {
-    window.speechSynthesis.cancel(); // Stop any pending speech
+    const speechId = activeSpeechId;
     if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
     }
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = options.rate || 1.0;
-    utterance.pitch = options.pitch || 1.05;
+    const chunks = splitSpeechText(text);
+    if (chunks.length === 0) {
+      isSpeechActive = false;
+      options.onEnd?.();
+      processSpeechQueue();
+      return;
+    }
 
-    // Pick female voice
     const femaleVoices = getAvailableFemaleVoices();
     let selectedVoice = null;
 
@@ -146,26 +192,81 @@ export const speakJarvisFemale = (text, options = {}) => {
       selectedVoice = indianVoice || femaleVoices[0];
     }
 
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-    }
-
-    if (options.onStart) {
-      utterance.onstart = options.onStart;
-    }
-
-    if (options.onEnd) {
-      utterance.onend = options.onEnd;
-    }
-
-    utterance.onerror = (e) => {
-      console.warn('Speech synthesis error', e);
-      if (options.onEnd) options.onEnd();
+    let chunkIndex = 0;
+    let hasStarted = false;
+    let hasEnded = false;
+    const finish = () => {
+      if (hasEnded || speechId !== activeSpeechId) return;
+      hasEnded = true;
+      isSpeechActive = false;
+      options.onEnd?.();
+      processSpeechQueue();
     };
 
-    window.speechSynthesis.speak(utterance);
+    const speakNextChunk = () => {
+      if (speechId !== activeSpeechId) return;
+      if (chunkIndex >= chunks.length) {
+        finish();
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(chunks[chunkIndex]);
+      chunkIndex += 1;
+      utterance.rate = options.rate || 1.0;
+      utterance.pitch = options.pitch || 1.05;
+      if (selectedVoice) utterance.voice = selectedVoice;
+
+      utterance.onstart = () => {
+        if (speechId !== activeSpeechId) return;
+        if (!hasStarted) {
+          hasStarted = true;
+          options.onStart?.();
+        }
+      };
+      utterance.onend = speakNextChunk;
+      utterance.onerror = (event) => {
+        if (speechId !== activeSpeechId) return;
+        if (event.error !== 'canceled' && event.error !== 'interrupted') {
+          console.warn('Speech synthesis error', event);
+        }
+        finish();
+      };
+
+      window.speechSynthesis.speak(utterance);
+    };
+
+    speakNextChunk();
   } catch (e) {
     console.warn('Speech synthesis failed', e);
-    if (options.onEnd) options.onEnd();
+    isSpeechActive = false;
+    options.onEnd?.();
+    processSpeechQueue();
   }
+};
+
+const processSpeechQueue = () => {
+  if (isSpeechActive || speechQueue.length === 0) return;
+  const next = speechQueue.shift();
+  isSpeechActive = true;
+  startSpeech(next.text, next.options);
+};
+
+export const enqueueJarvisFemale = (text, options = {}) => {
+  if (!text) {
+    options.onEnd?.();
+    return;
+  }
+  speechQueue.push({ text: String(text), options });
+  processSpeechQueue();
+};
+
+/** Speak immediately, replacing current and pending speech. */
+export const speakJarvisFemale = (text, options = {}) => {
+  stopSpeaking();
+  if (!text) {
+    options.onEnd?.();
+    return;
+  }
+  isSpeechActive = true;
+  startSpeech(String(text), options);
 };

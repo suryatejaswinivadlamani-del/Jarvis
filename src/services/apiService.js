@@ -6,7 +6,9 @@
  * specified by VITE_BACKEND_URL.
  */
 
-const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000/api';
+const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL || (
+  import.meta.env.DEV ? 'http://localhost:3001/api' : '/api'
+);
 
 export const apiService = {
   getBaseUrl() {

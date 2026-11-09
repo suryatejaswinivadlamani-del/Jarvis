@@ -4,6 +4,7 @@ import { playSciFiSound } from '../../utils/audio';
 export default function JarvisOrb({
   size = 'md',
   visualState = 'idle', // 'idle' | 'listening' | 'thinking' | 'speaking'
+  mood = 'neutral',
   isListening = false,
   isSpeaking = false,
   interactive = true,
@@ -28,7 +29,7 @@ export default function JarvisOrb({
   };
 
   return (
-    <div className={`orb-modular-container size-${size} state-${currentState}`}>
+    <div className={`orb-modular-container size-${size} state-${currentState} mood-${mood}`}>
       <div
         className={`arc-reactor-core state-${currentState}`}
         onClick={handleClick}
